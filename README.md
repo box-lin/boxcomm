@@ -3,7 +3,7 @@
 
 **Provided 2 versions of client-server communication:**
 1. command line
-2. graphical user interfaces`
+2. graphical user interfaces
 
 **Features**
 - simultaneously send and receive messages
@@ -15,4 +15,8 @@
 - 2. message listen thread implemented for listening messages coming from other side
 - 3. file listen thread implemented for listening file coming from other side
 
+**GUI APP DEMO**
+![](guiversion/img/appscreen.png)
 
+**Command Line Version**
+- Note that a constrain for command line is that, file to be transfer must in the /BoxComm/cmdversion/ directory

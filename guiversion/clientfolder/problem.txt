@@ -1,2 +1,0 @@
-1. when client disconnect and reconnect
-2. when server just hit quit

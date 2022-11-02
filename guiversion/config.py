@@ -4,6 +4,9 @@ fileport = 5722
 
 
 askquit = '!q'
+space = "   "
+fileactstr = "【File Activity】"
+ 
 
 buffer = 1024
 format = 'utf-8'

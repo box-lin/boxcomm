@@ -9,20 +9,21 @@ import os
 import config
 from tkinter import filedialog as fd
 
+
 class GoClient:
     def __init__(self):
         self.initGUI()
 
-        # msg socket 
+        # we use two sockets one for msg and one for file
         self.msgsocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
-
-        # file socket
         self.filesocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
 
+        # let a variable isConnect to keep track of connection  
         self.isConnect = False 
         self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: no keywords {config.askquit}')
         self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: client is running......')
 
+        # probe the connection first, the other two threads are only able going to the loop when isConnect = True
         self.initialConnect()
         self.startThreadListenMsg()
         self.startThreadListenFile()
@@ -76,6 +77,10 @@ class GoClient:
         self.browseButton = tkinter.Button(self.frame[3], text='Send File', width=10, command=self.sendFile)
         self.browseButton.pack(expand=1, side=tkinter.LEFT, padx=25, pady=5)
     
+    """
+    Probe the connection, if throws exception print something to panel
+    We connect two sockets!
+    """
     def initialConnect(self):
         try:
             self.msgsocket.connect((config.ip, config.msgport))
@@ -85,6 +90,10 @@ class GoClient:
         except:
             self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: failed the connection, please restart......')
 
+    # ------------------------------- Message Handling ---------------------------------------------- #
+    """
+    get input from GUI then send it using msgsocket
+    """
     def sendMessage(self):
         msg = self.inputText.get('1.0',tkinter.END)
         curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
@@ -93,18 +102,32 @@ class GoClient:
         self.chatText.insert(tkinter.END, '  ' + msg+'\n')
         self.inputText.delete(0.0,msg.__len__()-1.0)
 
-        # send 
+        # Only when is connected we send msg
         if self.isConnect:
             self.msgsocket.send(msg.encode(config.format))
         else:
             self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: Failed connection error...')
+        
+    """
+    using msgsoket.recv to receive msg from server
+    functional throughout the entire connection
+    """
+    def recMsg(self):
+        while self.isConnect:
+            servermsg = self.msgsocket.recv(config.buffer).decode(config.format)
+            if servermsg:
+                    curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+                    self.chatText.insert(tkinter.END,'Server Sent '+curtime+' :\n')
+                    self.chatText.insert(tkinter.END,f'{config.space}'+ servermsg)
 
+    def startThreadListenMsg(self):
+        thread=threading.Thread(target=self.recMsg,args=())
+        thread.daemon = True
+        thread.start()
 
-    def close(self):
-        if self.isConnect:
-            self.msgsocket.send(config.askquit.encode(config.format))
-        sys.exit()
+# ------------------------------------------------------------------------------------------------------------ # 
 
+# ----------------------------------- File Handling ---------------------------------------------------------- #
     def sendFile(self):
         filepath = fd.askopenfilename()
         filesize = os.path.getsize(filepath)
@@ -135,17 +158,9 @@ class GoClient:
                 cnt += len(bytesRead)
 
         theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-        self.chatText.insert(tkinter.END, 'Client ' + theTime + ' said:\n')
-        self.chatText.insert(tkinter.END, f'  File at {filepath} sent' )
-    
-
-    def recMsg(self):
-        while self.isConnect:
-            servermsg = self.msgsocket.recv(config.buffer).decode(config.format)
-            if servermsg:
-                    curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                    self.chatText.insert(tkinter.END,'Server Sent '+curtime+' :\n')
-                    self.chatText.insert(tkinter.END,'  '+ servermsg)
+        self.chatText.insert(tkinter.END, f'{config.fileactstr}Client ' + theTime + ' said:\n')
+        self.chatText.insert(tkinter.END, f'{config.space}File at {filepath} sent' )
+     
 
     def recFile(self):
         while self.isConnect:
@@ -162,7 +177,7 @@ class GoClient:
                 with open(fileloc, 'wb') as f:
                         cnt = 0
                         while cnt < filesize:
-                            bytesRead = self.filesocket.recv(1024)
+                            bytesRead = self.filesocket.recv(config.buffer)
                             if not bytesRead:
                                 break
                             print("Received data: ", bytesRead)
@@ -171,21 +186,25 @@ class GoClient:
                             cnt += len(bytesRead)
 
                 theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                self.chatText.insert(tkinter.END, '【File Activity】Client' + theTime + ' said:\n')
-                self.chatText.insert(tkinter.END, f'  Reeived a file and stored at {fileloc}' ) 
-
+                self.chatText.insert(tkinter.END, f'{config.fileactstr}Client' + theTime + ' said:\n')
+                self.chatText.insert(tkinter.END, f'{config.space}Reeived a file and stored at {fileloc}' ) 
             except:
                 continue
-
-    def startThreadListenMsg(self):
-        thread=threading.Thread(target=self.recMsg,args=())
-        thread.daemon = True
-        thread.start()
 
     def startThreadListenFile(self):
         thread = threading.Thread(target=self.recFile, args=())
         thread.daemon = True
         thread.start()
+        
+    # ------------------------------------------------------------------------------------------------------------ # 
+    """
+    when we close the app, we want to send a "quit" msg to server 
+    server then will close the sockets it accepted previously
+    """
+    def close(self):
+        if self.isConnect:
+            self.msgsocket.send(config.askquit.encode(config.format))
+        sys.exit()
     
 
 if __name__ == '__main__':

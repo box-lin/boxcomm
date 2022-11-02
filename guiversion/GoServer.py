@@ -82,6 +82,8 @@ class GoServer:
         self.browseButton = tkinter.Button(self.frame[3], text='Send File', width=10, command=self.sendFile)
         self.browseButton.pack(expand=1, side=tkinter.LEFT, padx=25, pady=5)
 
+    # ------------------------------- Message Handling ---------------------------------------------- #
+
     def sendMessage(self):
         msg = self.inputText.get('1.0',tkinter.END)
         curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
@@ -96,10 +98,35 @@ class GoServer:
         else:
             self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: You did not connect to a client\n')
 
+    def recMsg(self):
+        while True:
+            self.clientmsgsocket, self.clientmsgsocketaddr = self.msgsocket.accept()
+            self.clientfilesocket, self.clientfilesocketaddr = self.filesocket.accept()
+            self.isConnect = True 
+            self.chatText.insert(tkinter.END,'server connected to client!')
 
-    def close(self):
-        sys.exit()
+            while self.isConnect:
+                clientmsg = self.clientmsgsocket.recv(config.buffer).decode(config.format)
+                if clientmsg:
+                    if clientmsg.strip() == config.askquit:
+                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+                        self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: Client quited at '+curtime)
+                        self.isConnect = False 
+                        self.clientfilesocket.close()
+                        self.clientmsgsocket.close()
+                    else:
+                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+                        self.chatText.insert(tkinter.END,'Client Sent '+curtime+' :\n')
+                        self.chatText.insert(tkinter.END,'  '+ clientmsg)
 
+    def startThreadListenMsg(self):
+        thread=threading.Thread(target=self.recMsg,args=())
+        thread.daemon = True
+        thread.start()
+
+    # ------------------------------------------------------------------------------------------------------------ # 
+
+    # ----------------------------------- File Handling ---------------------------------------------------------- #
 
     def sendFile(self):
         filepath = fd.askopenfilename()
@@ -131,32 +158,8 @@ class GoServer:
                 cnt += len(bytesRead)
 
         theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-        self.chatText.insert(tkinter.END, 'Server' + theTime + ' said:\n')
-        self.chatText.insert(tkinter.END, f'  File at {filepath} sent' )
-
-
-
-   # allows for reconnection
-   # since we do the initial connection here 
-   # we will just connect the filesocket as well
-    def recMsg(self):
-        while True:
-            self.clientmsgsocket, self.clientmsgsocketaddr = self.msgsocket.accept()
-            self.clientfilesocket, self.clientfilesocketaddr = self.filesocket.accept()
-            self.isConnect = True 
-            self.chatText.insert(tkinter.END,'server connected to client!')
-
-            while self.isConnect:
-                clientmsg = self.clientmsgsocket.recv(config.buffer).decode(config.format)
-                if clientmsg:
-                    if clientmsg.strip() == config.askquit:
-                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                        self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: Client quited at '+curtime)
-                        self.isConnect = False 
-                    else:
-                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                        self.chatText.insert(tkinter.END,'Client Sent '+curtime+' :\n')
-                        self.chatText.insert(tkinter.END,'  '+ clientmsg)
+        self.chatText.insert(tkinter.END, f'{config.fileactstr}Server' + theTime + ' said:\n')
+        self.chatText.insert(tkinter.END, f'  File at {filepath} sent' ) 
         
     def recFile(self):
         while True:
@@ -182,21 +185,19 @@ class GoServer:
                             cnt += len(bytesRead)
 
                 theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                self.chatText.insert(tkinter.END, '【File Activity】Server' + theTime + ' said:\n')
-                self.chatText.insert(tkinter.END, f'Reeived a file and stored at {fileloc}' ) 
-
+                self.chatText.insert(tkinter.END, f'{config.fileactstr}Server' + theTime + ' said:\n')
+                self.chatText.insert(tkinter.END, f'{config.space}Received a file and stored at {fileloc}' ) 
             except:
                 continue
-
-    def startThreadListenMsg(self):
-        thread=threading.Thread(target=self.recMsg,args=())
-        thread.daemon = True
-        thread.start()
 
     def startThreadListenFile(self):
         thread = threading.Thread(target=self.recFile, args=())
         thread.daemon = True
         thread.start()
+    # ------------------------------------------------------------------------------------------------------------ # 
+
+    def close(self):
+        sys.exit()
 
 if __name__ == '__main__':
     server = GoServer()
