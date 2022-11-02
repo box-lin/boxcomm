@@ -187,7 +187,7 @@ class GoClient:
 
                 theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
                 self.chatText.insert(tkinter.END, f'{config.fileactstr}Client' + theTime + ' said:\n')
-                self.chatText.insert(tkinter.END, f'{config.space}Reeived a file and stored at {fileloc}' ) 
+                self.chatText.insert(tkinter.END, f'{config.space}Received a file and stored at {fileloc}' ) 
             except:
                 continue
 

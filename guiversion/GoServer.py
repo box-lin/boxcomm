@@ -27,7 +27,7 @@ class GoServer:
         self.filesocket.listen()
 
         self.isConnect = False 
-        self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: {config.askquit}')
+        self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: no keywords {config.askquit}')
         self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: server is running......')
         
         self.startThreadListenMsg()
