@@ -3,7 +3,7 @@ import socket
 import config
 import threading
 import os
-import tqdm
+import sys
 
 class Server:
 
@@ -27,11 +27,11 @@ class Server:
 
 
         # two threads that listening for message and file 
-        msgthread = threading.Thread(target=self.listenMsg, args=())
-        msgthread.start() 
+        self.msgthread = threading.Thread(target=self.listenMsg, args=())
+        self.msgthread.start() 
 
-        filethread = threading.Thread(target=self.listenFile, args=())
-        filethread.start()
+        self.filethread = threading.Thread(target=self.listenFile, args=())
+        self.filethread.start()
 
         self.getInput()
 
@@ -103,12 +103,22 @@ class Server:
     # server running and talk
     def getInput(self) -> None:
         while True:
-            print("[Menu] 1 = send message | 2 = send file ")
+            print("[Menu] 1 = send message | 2 = send file | 3 = quit")
             cmd = input("cmd>> \n")
             if cmd.strip() == '1':
                 self.sendMessage() 
             elif cmd.strip() == '2':
                 self.sendFile() 
+            elif cmd.strip() == '3':
+                self.clientfilesocket.close()
+                self.clientmsgsocket.close()
+                self.msgsocket.close()
+                self.filesocket.close() 
+                self.msgthread.join()
+                self.filethread.join()
+                sys.exit()
+            else:
+                continue
 
 
 if __name__ == "__main__":
