@@ -1,35 +1,29 @@
 
-import sys
 import tkinter
 import tkinter.font as tkFont
 import socket
 import threading
 import time
-from tkinter import filedialog as fd
-import os
+import sys
+import os 
 import config
+from tkinter import filedialog as fd
 
-class GoServer:
-    
+class GoClient:
     def __init__(self):
         self.initGUI()
 
-       # msg socket 
+        # msg socket 
         self.msgsocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
-        self.msgsocket.bind((config.ip,config.msgport))
-       
 
         # file socket
         self.filesocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
-        self.filesocket.bind((config.ip,config.fileport))
-        
-        self.msgsocket.listen() 
-        self.filesocket.listen()
 
         self.isConnect = False 
-        self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: {config.askquit}')
-        self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: server is running......')
-        
+        self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: no keywords {config.askquit}')
+        self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: client is running......')
+
+        self.initialConnect()
         self.startThreadListenMsg()
         self.startThreadListenFile()
 
@@ -38,7 +32,7 @@ class GoServer:
     """
     def initGUI(self):
         self.root=tkinter.Tk()
-        self.root.title('BoxComm [Server]')
+        self.root.title('BoxComm [Client]')
         # 4 panel frames
         self.frame=[tkinter.Frame(),tkinter.Frame(),tkinter.Frame(),tkinter.Frame()]
 
@@ -81,25 +75,35 @@ class GoServer:
         # [browse and send file button]
         self.browseButton = tkinter.Button(self.frame[3], text='Send File', width=10, command=self.sendFile)
         self.browseButton.pack(expand=1, side=tkinter.LEFT, padx=25, pady=5)
+    
+    def initialConnect(self):
+        try:
+            self.msgsocket.connect((config.ip, config.msgport))
+            self.filesocket.connect((config.ip, config.fileport))
+            self.isConnect = True
+            self.chatText.insert(tkinter.END,'client connected to server!')
+        except:
+            self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: failed the connection, please restart......')
 
     def sendMessage(self):
         msg = self.inputText.get('1.0',tkinter.END)
         curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
         
-        self.chatText.insert(tkinter.END, 'Server Said ' + curtime + ' :\n')
+        self.chatText.insert(tkinter.END, 'Client Said ' + curtime + ' :\n')
         self.chatText.insert(tkinter.END, '  ' + msg+'\n')
         self.inputText.delete(0.0,msg.__len__()-1.0)
 
         # send 
         if self.isConnect:
-            self.clientmsgsocket.send(msg.encode(config.format))
+            self.msgsocket.send(msg.encode(config.format))
         else:
-            self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: You did not connect to a client\n')
+            self.chatText.insert(tkinter.END,f'<SYSTEM WARNING>: Failed connection error...')
 
 
     def close(self):
+        if self.isConnect:
+            self.msgsocket.send(config.askquit.encode(config.format))
         sys.exit()
-
 
     def sendFile(self):
         filepath = fd.askopenfilename()
@@ -116,8 +120,8 @@ class GoServer:
         headerlen += b' '* (config.buffer - len(headerlen))
 
         # 3) tell client the headerlen first then headerstr
-        self.clientfilesocket.send(headerlen)
-        self.clientfilesocket.send(headerstr)
+        self.filesocket.send(headerlen)
+        self.filesocket.send(headerstr)
 
 
         # 4) get file bytes and sendall
@@ -127,53 +131,38 @@ class GoServer:
                 bytesRead = f.read(config.buffer)
                 if not bytesRead:
                     break 
-                self.clientfilesocket.sendall(bytesRead)
+                self.filesocket.sendall(bytesRead)
                 cnt += len(bytesRead)
 
         theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-        self.chatText.insert(tkinter.END, 'Server' + theTime + ' said:\n')
+        self.chatText.insert(tkinter.END, 'Client ' + theTime + ' said:\n')
         self.chatText.insert(tkinter.END, f'  File at {filepath} sent' )
+    
 
-
-
-   # allows for reconnection
-   # since we do the initial connection here 
-   # we will just connect the filesocket as well
     def recMsg(self):
-        while True:
-            self.clientmsgsocket, self.clientmsgsocketaddr = self.msgsocket.accept()
-            self.clientfilesocket, self.clientfilesocketaddr = self.filesocket.accept()
-            self.isConnect = True 
-            self.chatText.insert(tkinter.END,'server connected to client!')
+        while self.isConnect:
+            servermsg = self.msgsocket.recv(config.buffer).decode(config.format)
+            if servermsg:
+                    curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
+                    self.chatText.insert(tkinter.END,'Server Sent '+curtime+' :\n')
+                    self.chatText.insert(tkinter.END,'  '+ servermsg)
 
-            while self.isConnect:
-                clientmsg = self.clientmsgsocket.recv(config.buffer).decode(config.format)
-                if clientmsg:
-                    if clientmsg.strip() == config.askquit:
-                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                        self.chatText.insert(tkinter.END,'<SYSTEM WARNING>: Client quited at '+curtime)
-                        self.isConnect = False 
-                    else:
-                        curtime = time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                        self.chatText.insert(tkinter.END,'Client Sent '+curtime+' :\n')
-                        self.chatText.insert(tkinter.END,'  '+ clientmsg)
-        
     def recFile(self):
-        while True:
+        while self.isConnect:
             try:
-                headerlen = int(self.clientfilesocket.recv(config.buffer).decode(config.format))
-                headerstr = str(self.clientfilesocket.recv(headerlen).decode(config.format))
+                headerlen = int(self.filesocket.recv(config.buffer).decode(config.format))
+                headerstr = str(self.filesocket.recv(headerlen).decode(config.format))
                 filename, filesize = headerstr.split(config.sep)
                 filesize = int(filesize)
 
                 print("Received filename: ", filename)
                 print("Received filesize: ", filesize)
 
-                fileloc = config.serverfolder + filename
+                fileloc = config.clientfolder + filename
                 with open(fileloc, 'wb') as f:
                         cnt = 0
                         while cnt < filesize:
-                            bytesRead = self.clientfilesocket.recv(config.buffer)
+                            bytesRead = self.filesocket.recv(1024)
                             if not bytesRead:
                                 break
                             print("Received data: ", bytesRead)
@@ -182,8 +171,8 @@ class GoServer:
                             cnt += len(bytesRead)
 
                 theTime=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-                self.chatText.insert(tkinter.END, '【File Activity】Server' + theTime + ' said:\n')
-                self.chatText.insert(tkinter.END, f'Reeived a file and stored at {fileloc}' ) 
+                self.chatText.insert(tkinter.END, '【File Activity】Client' + theTime + ' said:\n')
+                self.chatText.insert(tkinter.END, f'  Reeived a file and stored at {fileloc}' ) 
 
             except:
                 continue
@@ -197,7 +186,9 @@ class GoServer:
         thread = threading.Thread(target=self.recFile, args=())
         thread.daemon = True
         thread.start()
+    
 
 if __name__ == '__main__':
-    server = GoServer()
-    server.root.mainloop()
+    client = GoClient()
+    # server.startThreadListenMsg()
+    client.root.mainloop()
