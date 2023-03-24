@@ -1,8 +1,5 @@
 # BoxComm
 
-**Video Demo**
-- https://www.youtube.com/watch?v=u90GiPnVHZQ&t=49s
-
 **Provided 2 versions of client-server communication:**
 1. command line (experimental of transferring messages and files, didnt handle disconnection)
 2. graphical user interfaces (functional transffering messages and files and disconnection and better GUI)
